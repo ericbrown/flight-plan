@@ -13,6 +13,7 @@ Check for `.claude/memory/` in the project root.
 2. `.claude/memory/activeContext.md`
 3. `.claude/memory/progress.md`
 4. `.claude/memory/conventions.md` — note the top 1–2 most relevant patterns
+5. `.claude/memory/sessions/` — scan for the most recent session file if activeContext seems stale
 
 **If it does not exist**, check for fallback files:
 - `plan.md` in project root

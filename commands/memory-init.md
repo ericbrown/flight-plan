@@ -24,7 +24,7 @@ Ask the user (can be answered in one message):
 ## Step 3 — Create directory and config
 
 ```
-mkdir -p .claude/memory
+mkdir -p .claude/memory/sessions
 ```
 
 Write `.claude/project-config.json` (merge with existing if present):
@@ -101,7 +101,7 @@ New project: [name]. Run /session-start and describe what to build first.
 ```markdown
 # Progress
 
-## Done
+## Completed
 (nothing yet)
 
 ## In progress
@@ -175,6 +175,7 @@ Created:
   .claude/memory/decisionLog.md
   .claude/memory/conventions.md
   .claude/memory/sessionHistory.md
+  .claude/memory/sessions/          (dated session files go here)
 
 Linear fields (linear_team_id etc.) will be set on first /plan:tasks run.
 

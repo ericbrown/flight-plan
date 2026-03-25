@@ -22,7 +22,7 @@ This becomes the `activeContext.md` content. Capture THINKING, not just files ch
 
 Write or update each file in `.claude/memory/`:
 
-**`activeContext.md`** — Replace entirely:
+**`activeContext.md`** — Replace entirely (this is the "latest state" snapshot for session-start):
 ```markdown
 # Active Context
 Last updated: [date]
@@ -44,10 +44,31 @@ Last updated: [date]
 that happened was Y. Your next step is Z. Watch out for W."]
 ```
 
-**`progress.md`** — Update status:
+**`.claude/memory/sessions/[YYYY-MM-DD-HHmm].md`** — Create a NEW dated file (never overwrite previous sessions):
 ```markdown
-## Done
-- [x] [task] — [one-line result]
+# Session — [date and time]
+
+## Goal
+[one sentence]
+
+## What happened
+[2-5 bullets: what was built, fixed, or decided]
+
+## What failed / was abandoned
+[specific — prevents future sessions from retrying dead ends]
+
+## Decisions made
+[architectural or approach decisions with rationale]
+
+## Resume prompt
+[same as activeContext — written for a fresh Claude instance]
+```
+This preserves a complete history of every session. `activeContext.md` is the "latest" pointer; the sessions directory is the full log.
+
+**`progress.md`** — Update status. Move completed items to the Completed section with dates (never delete them):
+```markdown
+## Completed
+- [x] [task] — [one-line result] (completed [date])
 
 ## In progress
 - [ ] [task] — [current state]
@@ -55,6 +76,7 @@ that happened was Y. Your next step is Z. Watch out for W."]
 ## Up next
 - [ ] [task]
 ```
+Items move DOWN the file as they progress: Up next → In progress → Completed. Never remove completed items — they're the project's work history.
 
 **`sessionHistory.md`** — Append (never replace):
 ```
