@@ -1,0 +1,15 @@
+# Machine-specific — don't commit these
+settings.local.json
+*.local.json
+
+# Backups created by install.sh
+backups/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
