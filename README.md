@@ -1,17 +1,26 @@
-# claude-workflow
+# Flight Plan
 
-Personal Claude Code workflow — persistent memory, Boris-style planning, Linear integration, and auto-skills.
+A workflow system for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) that adds persistent memory, structured planning, auto-triggering skills, and Linear integration.
 
-**The main entry point:** `/boris <task>` — describe what to build, answer a couple of questions, say **"go"**. Everything else runs automatically.
+---
+
+## What's in here
+
+| Component | What it does |
+|-----------|--------------|
+| **Commands** | 20 slash commands for planning, verification, git workflow, and session management |
+| **Skills** | Auto-triggering behaviors (TDD, systematic debugging, verification gates) |
+| **Memory Bank** | Persistent project context that survives across sessions |
+| **Hooks** | Pre/post tool-use guards (destructive op protection, auto-formatting) |
+| **Linear sync** | Automatic issue creation and progress updates |
 
 ---
 
 ## Install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/claude-workflow.git ~/Documents/claude-workflow
-cd ~/Documents/claude-workflow
-chmod +x install.sh sync-lessons.sh
+git clone https://github.com/ericbrown/flight-plan.git ~/flight-plan
+cd ~/flight-plan
 ./install.sh
 ```
 
@@ -19,168 +28,128 @@ Safe to re-run. Backs up existing config, merges learned patterns, preserves mac
 
 **Update anytime:**
 ```bash
-cd ~/Documents/claude-workflow && git pull && ./install.sh
+cd ~/flight-plan && git pull && ./install.sh
 ```
 
 ---
 
-## First time in a project
+## Getting started
+
+### First time in a project
 
 ```bash
 cd /your/project
 claude
-/memory-init       # one-time setup: creates .claude/memory/ with persistent context
-/session-start     # loads context, presents summary, enters plan mode
+/memory-init       # one-time: creates .claude/memory/ for persistent context
+```
+
+### Every session
+
+```bash
+/session-start     # loads context, shows project state
+# ... do your work ...
+/session-end       # saves context, syncs to Linear
 ```
 
 ---
 
-## Daily workflow
+## Core concepts
 
-### The short version
+### Memory Bank
 
-```
-/session-start               # load context
-/boris implement <feature>   # plan + "go" + execute + verify + PR
-/session-end                 # save everything
-```
+Each project gets `.claude/memory/` — persistent context that Claude reads at session start:
 
-### The full picture
-
-| Step | Command | What happens |
-|------|---------|--------------|
-| Start | `/session-start` | Reads Memory Bank, presents project summary, enters plan mode |
-| Describe task | `/boris <task>` | Scopes the work, writes plan.md in batches, creates Linear issues |
-| Review plan | *(annotate plan.md)* | Add `<!-- skip -->`, `<!-- use X instead -->` inline comments |
-| Execute | say **"go"** | Runs each task via subagents, updates Linear, commits as it goes |
-| Verify | *(auto-runs)* | typecheck → full tests → lint → build |
-| Ship | *(auto-runs)* | Creates PR, posts PR link to Linear issues |
-| End | `/session-end` | Saves Memory Bank, posts session summary to Linear, captures lessons |
-
----
-
-## Why "go"?
-
-`/boris` runs two approval gates before touching any code:
-
-1. **After scope** — "Scope looks right? Any corrections?" → you review affected files
-2. **After plan** — "Plan complete. Annotate then say 'go'" → you annotate, then say go
-
-After "go" it runs autonomously: subagent per task, Linear updated at each stage, reverts on failure, never patches bad approaches.
-
----
-
-## The planning hang fix
-
-`/plan:tasks` writes tasks in **batches of 5** with an explicit stop after each batch. The model terminates cleanly at each batch boundary rather than trying to generate an entire plan in one unbounded pass — which is why superpowers' `/write-plan` hung on complex projects.
-
----
-
-## Memory Bank
-
-Each project gets `.claude/memory/` — run `/memory-init` once:
-
-| File | Contents |
-|------|----------|
-| `projectContext.md` | What the project is, architecture, stack, key entry points |
-| `activeContext.md` | Current state: goal, approach, what failed, resume prompt |
-| `progress.md` | Tasks: done / in progress / up next |
+| File | Purpose |
+|------|---------|
+| `projectContext.md` | Architecture, stack, key entry points |
+| `activeContext.md` | Current goal, approach, what to try next |
+| `progress.md` | Done / in progress / up next |
 | `decisionLog.md` | Architecture decisions with rationale |
-| `conventions.md` | Project-specific corrections, auto-updated during sessions |
-| `sessionHistory.md` | Rolling session summaries (append-only) |
+| `conventions.md` | Project-specific patterns (auto-updated) |
 
-Plus `.claude/task-context.md` on each feature branch — **committed to git** for cross-machine handoff. `git pull` on any machine → Claude has full context.
+Run `/memory-init` once per project to create these.
 
----
+### Skills (auto-triggering)
 
-## Linear integration
+No commands needed — these activate based on context:
 
-Every task in every plan automatically gets a Linear issue. No manual issue creation needed.
+| Skill | Activates when... |
+|-------|------------------|
+| `tdd` | Implementing new functions, classes, or endpoints |
+| `systematic-debugging` | Tests fail or build errors |
+| `verification-before-completion` | About to mark a task done |
+| `finishing-a-branch` | All tasks complete, ready for PR |
+| `worktrees` | Running parallel sessions on the same repo |
 
-| Event | What happens in Linear |
-|-------|----------------------|
-| `/plan:tasks` creates a task | Issue created with description + plan + acceptance criteria |
-| `/execute` starts a task | Issue moved to **In Progress** + starting comment |
-| Test written (red) | Comment: "Test written, confirmed failing" |
-| Implementation written | Comment: "Implementation written, running verification" |
-| Task passes verification | Comment: "Verified, committed [hash]" |
-| Task blocked / fails | Comment: exact error output + "reverted" |
-| PR created | Comment: PR link on all completed issues |
-| `/session-end` | Comment: session summary + resume prompt on all active issues |
-| You | **Only you close issues** — nothing in this workflow ever closes them |
+### Planning pipeline
 
-Linear team + project IDs are resolved on first `/plan:tasks` run and saved to `.claude/project-config.json`.
+For complex tasks, use the 3-stage planning pipeline:
+
+```
+/plan:context    →  scope + affected files (approval gate)
+/plan:tasks      →  tasks in batches of 5 (annotation gate)
+/execute         →  one subagent per task, Linear updated throughout
+```
+
+Or use `/boris <task>` to run all three stages with approval gates.
+
+### Modes
+
+Switch Claude's behavior for different phases of work:
+
+| Mode | Behavior |
+|------|----------|
+| `/mode architect` | Read-only design — no file edits |
+| `/mode code` | Full implementation (default) |
+| `/mode debug` | Investigation, hypothesis-driven |
+| `/mode review` | Strictly read-only review |
+| `/mode audit` | Security scanning with logging |
 
 ---
 
 ## All commands
 
-### Main
+### Session
 | Command | What it does |
 |---------|-------------|
-| `/boris <task>` | Full orchestrated workflow end-to-end |
-| `/session-start` | Load Memory Bank, orient to project, enter plan mode |
-| `/session-end` | Save context, update Linear, remind about lesson sync |
+| `/session-start` | Load Memory Bank, orient to project |
+| `/session-end` | Save context, update Linear, capture lessons |
+| `/context` | Show context window usage + Memory Bank status |
+| `/handoff` | Save cognitive state for cross-session handoff |
+| `/memory-init` | Initialize Memory Bank (once per project) |
 
-### Planning (3-stage pipeline)
+### Planning
 | Command | What it does |
 |---------|-------------|
-| `/plan:context` | Stage 1: scope + affected files, approval gate |
-| `/plan:tasks` | Stage 2: tasks in batches of 5, Linear issues created, annotation gate |
-| `/execute` | Stage 3: subagent per task, Linear updated throughout |
+| `/boris <task>` | Full workflow: plan → execute → verify → PR |
+| `/plan:context` | Stage 1: scope + affected files |
+| `/plan:tasks` | Stage 2: tasks in batches, Linear issues created |
+| `/execute` | Stage 3: run tasks via subagents |
 
 ### Quality
 | Command | What it does |
 |---------|-------------|
-| `/verify` | typecheck → tests → lint → build — full suite |
-| `/test-and-fix` | Run tests, fix failures iteratively until green |
-| `/simplify` | Code-simplifier subagent — clean up after implementation |
-| `/review-changes` | Read-only pre-commit review: correctness, coverage, conventions |
+| `/verify` | typecheck → tests → lint → build |
+| `/test-and-fix` | Run tests, fix failures iteratively |
+| `/simplify` | Clean up code after implementation |
+| `/review-changes` | Pre-commit review of uncommitted changes |
 
 ### Git
 | Command | What it does |
 |---------|-------------|
 | `/task-branch <name>` | Create feature branch + task context |
-| `/task-done` | Verify, PR, remove task context, update Memory Bank |
+| `/task-done` | Verify, PR, clean up task context |
 | `/commit-push-pr` | Stage, commit, push, create PR |
-| `/checkpoint [name]` | Create named git tag save point |
+| `/checkpoint [name]` | Create named save point |
 | `/rollback [target]` | Restore checkpoint or go back N commits |
-| `/undo` | Revert last Claude-made commit safely |
-
-### Context & memory
-| Command | What it does |
-|---------|-------------|
-| `/memory-init` | Initialize Memory Bank (run once per project) |
-| `/context` | Context window usage + Memory Bank + plan status |
-| `/handoff` | Cognitive briefing — saves mental model for cross-session handoff |
-
-### Modes (Boris-style)
-| Command | What it does |
-|---------|-------------|
-| `/mode architect` | Read-only design mode — no file edits |
-| `/mode code` | Full implementation (default) |
-| `/mode debug` | Investigation, hypothesis-driven, limited writes |
-| `/mode review` | Strictly read-only code review |
-| `/mode audit` | Security scanning with logging |
+| `/undo` | Revert last commit safely |
 
 ### Linear
 | Command | What it does |
 |---------|-------------|
-| `/linear-update` | Add progress comment to current task's issue |
-| `/linear-update PROJ-123` | Add comment to a specific issue |
-| `/linear-update plan` | Push revised plan.md to all issues |
-
----
-
-## Auto-triggering skills
-
-No commands needed — these activate automatically:
-
-| Skill | Activates when... |
-|-------|------------------|
-| `tdd` | Implementing any new function, class, or endpoint |
-| `systematic-debugging` | A test fails or build errors out |
-| `worktrees` | Running parallel sessions on the same repo |
+| `/linear-update` | Add progress comment to current issue |
+| `/linear-update <ID>` | Comment on specific issue |
+| `/linear-update plan` | Push plan to all issues |
 
 ---
 
@@ -188,99 +157,75 @@ No commands needed — these activate automatically:
 
 | Hook | Trigger | What it does |
 |------|---------|--------------|
-| `destructive-ops-guard` | Before `git reset --hard`, `rm -rf`, force-push | Creates checkpoint tag, stashes dirty files |
-| `post-edit-formatter` | After any file edit | Auto-formats: prettier / ruff / gofmt by extension |
+| `destructive-ops-guard` | Before `git reset --hard`, `rm -rf`, force-push | Creates checkpoint, stashes dirty files |
+| `post-edit-formatter` | After file edits | Auto-formats by file type |
 
 ---
 
-## Parallel fleet (Boris-style)
+## Linear integration
 
-Run 3–5 sessions simultaneously using git worktrees:
+When using the planning commands, every task automatically gets a Linear issue:
+
+- Issues created during `/plan:tasks`
+- Moved to In Progress when `/execute` starts each task
+- Progress comments at each stage
+- Session summary posted by `/session-end`
+- Issues are never auto-closed — only you close them
+
+Linear team/project IDs are saved to `.claude/project-config.json` after first use.
+
+---
+
+## Parallel sessions
+
+Run multiple Claude Code sessions using git worktrees:
 
 ```bash
-# From your main project directory:
-# Example: create parallel worktrees for your project
+# Create parallel worktrees
 git worktree add ~/<project>-2 -b feature/new-api
 git worktree add ~/<project>-3 -b fix/some-bug
 
-# Each worktree gets its own Claude Code session (separate terminal tab)
-# Each tab works on a different branch — no conflicts, no stashing needed
+# Each worktree gets its own terminal + Claude session
+# No conflicts, no stashing needed
 ```
 
-Conventions: `~/[repo]-2`, `~/[repo]-3` etc. Each gets its own `.claude/task-context.md`.
 See the `worktrees` skill for full setup.
 
 ---
 
-## Syncing learned patterns across machines
+## Syncing learned patterns
 
-Lessons accumulate in `~/.claude/CLAUDE.md` as Claude makes mistakes and you correct them.
-Sync them so all machines benefit:
+Lessons accumulate in `~/.claude/CLAUDE.md` as you correct Claude. Sync them across machines:
 
 ```bash
-# After any work session:
-cd ~/Documents/claude-workflow
-./sync-lessons.sh                                      # local → repo
+cd ~/flight-plan
+./sync-lessons.sh              # local → repo
 git add CLAUDE.md && git commit -m "sync lessons" && git push
 
-# On another machine (local or Ubuntu server via Tailscale):
-git pull && ./sync-lessons.sh --pull                   # repo → local
-
-# Both directions at once:
-./sync-lessons.sh --both
+# On another machine:
+git pull && ./sync-lessons.sh --pull
 ```
-
-Deduplicates by `### heading` — safe to run repeatedly, never removes existing lessons.
 
 ---
 
 ## File structure
 
 ```
-claude-workflow/
-  CLAUDE.md              Global instructions + learned patterns (the brain)
-  install.sh             Installer — safe to re-run
-  sync-lessons.sh        Bidirectional lesson sync across machines
-  settings.base.json     Hook wiring + permissions
-  .gitignore
+flight-plan/
+  CLAUDE.md              # Global instructions + learned patterns
+  install.sh             # Installer (safe to re-run)
+  sync-lessons.sh        # Lesson sync across machines
+  settings.base.json     # Hook config + permissions
 
-  commands/              Slash commands (19 total)
-    boris.md             ← main entry point
-    session-start.md
-    session-end.md
-    plan-context.md
-    plan-tasks.md
-    execute.md
-    verify.md
-    test-and-fix.md
-    simplify.md
-    review-changes.md
-    task-branch.md
-    task-done.md
-    commit-push-pr.md
-    checkpoint.md
-    rollback.md
-    undo.md
-    context.md
-    handoff.md
-    mode.md
-    linear-update.md
-
-  agents/
-    linear-sync.md       Linear MCP agent — all issue operations
-
-  skills/                Auto-triggering skills (no command needed)
-    tdd.md
-    systematic-debugging.md
-    worktrees.md
-
-  hooks/                 Lifecycle hooks
-    destructive-ops-guard.sh
-    post-edit-formatter.sh
-
-  memory-template/       Starter files used by /memory-init
-    projectContext.md
-    activeContext.md
-    progress.md
-    conventions.md
+  commands/              # Slash commands (20)
+  skills/                # Auto-triggering behaviors (5)
+  agents/                # Subagent definitions
+  hooks/                 # Lifecycle hooks
+  memory-template/       # Starter files for /memory-init
 ```
+
+---
+
+## License
+
+MIT
