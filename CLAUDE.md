@@ -36,16 +36,17 @@ The `/boris` command is just a shortcut to the same behavior. Both paths run the
 
 ---
 
-# Linear Integration
+# Linear Integration (MANDATORY)
 
-Every plan task automatically gets a Linear issue. Rules:
+Linear is the source of truth for all development work. These rules are non-negotiable:
 
+- **Every piece of work gets a Linear issue.** If you start working on something and no issue exists, create one immediately in the correct project before writing code.
+- **Move to In Progress** the moment you start working on a task. Not after. Not when you're halfway done. When you start.
+- **Document progress as comments**, not by editing the original description/summary. The description is the spec; comments are the work log. Add comments at each meaningful stage: investigation started, approach chosen, implementation in progress, tests written, verified, PR created.
+- **Mark as Done** when the work is complete and verified. Don't leave issues in progress after finishing.
+- **Be as detailed as possible.** Linear issues should tell the full story: what was done, why, what was tried, what worked. A future reader should understand the entire arc from the issue alone.
 - **Issues created** during `/plan:tasks` — one per task, via `linear-sync` subagent
-- **Moved to In Progress** at the start of each task in `/execute`
-- **Progress comments** added at each stage: test written → implemented → verified
-- **Plan added** to each issue description when tasks are created
 - **Session summary** added by `/session-end`
-- **NEVER closed automatically** — only you close issues, when you're ready
 - Linear team/project ID saved to `.claude/project-config.json` after first use
 - Use `/linear-update` for ad-hoc comments mid-session
 
@@ -141,8 +142,11 @@ A batch of 5 tasks always terminates. An entire plan sometimes doesn't.
 - Review conventions at session start — especially after multi-day gaps.
 - Update CLAUDE.md at session-end via the `@.claude` pattern: tag learnings directly.
 
-## 5. Git Safety (Boris)
-- ALL work on feature branches, not main. Exception: first <5 commits on a brand-new project.
+## 5. Git Workflow (Boris)
+- **ALL work on feature branches.** No exceptions. Never commit directly to main or dev.
+- **Always create a pull request** from the feature branch to dev when work is ready to merge. Never merge directly without a PR.
+- **Be as detailed as possible** on pull requests and commit messages. PRs should explain what changed, why, and how to test it. Commits should be descriptive, not "fix stuff."
+- **Check GitHub for merged PRs** proactively. After creating a PR, check back to see if it's been merged without being told. Don't wait for instructions.
 - Always run `git remote -v` before pushing — confirm the exact remote and branch.
 - Use `/checkpoint` before any risky operation (reset, rebase, migration).
 - Never force-push to main/master — this is in the deny list.
